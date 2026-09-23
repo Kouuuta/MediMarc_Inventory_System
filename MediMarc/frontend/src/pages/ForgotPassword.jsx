@@ -1,17 +1,14 @@
 import { useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import "../styles/ForgotPassword.css";
-import { SecureUniqueForge } from "unique-forge";
 import { toast } from "sonner";
+import api from "../services/api";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState(""); // State for holding inputted email
-  const [resetLink, setResetLink] = useState(""); // State for storing the reset link
+  const [resetLink] = useState(""); // State for storing the reset link
   const [error, setError] = useState(""); // State for error messages
   const navigate = useNavigate();
-  const forge = new SecureUniqueForge(); // url friendly decoded string
-  const resetToken = forge.generate();
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -22,10 +19,7 @@ const ForgotPassword = () => {
     try {
       console.log("🔍 Debug: Sending forgot password request...");
 
-      const response = await axios.post(
-        "http://localhost:8000/api/forgot-password/",
-        { email }
-      );
+      const response = await api.post("/forgot-password/", { email });
       toast.message(
         "Reset link has been sent!:",
         { description: "You may check your gmail." },

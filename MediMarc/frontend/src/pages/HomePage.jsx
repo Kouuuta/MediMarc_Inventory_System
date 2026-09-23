@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaUsers,
@@ -7,11 +7,11 @@ import {
   FaShoppingCart,
   FaUserFriends,
 } from "react-icons/fa";
-import axios from "axios";
 import "../styles/HomePage.css";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { ResponsiveContainer } from "recharts";
 import { format } from "date-fns";
+import api from "../services/api";
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -30,13 +30,7 @@ const HomePage = () => {
     // Inside HomePage.jsx or wherever you need to refresh low stock products:
     const fetchLowStockProducts = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const response = await axios.get(
-          "http://localhost:8000/api/products/low-stock/",
-          { headers }
-        );
+        const response = await api.get("/products/low-stock/");
 
         setLowStockProducts(response.data); // Update the low stock products state
       } catch (error) {
@@ -53,14 +47,9 @@ const HomePage = () => {
   useEffect(() => {
     const fetchSalesData = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const response = await axios.post(
-          "http://localhost:8000/api/sales/total/", // Ensure this endpoint returns expected data
-          { days: selectedRange },
-          { headers }
-        );
+        const response = await api.post("/sales/total/", {
+          days: selectedRange,
+        });
 
         // ✅ Update rangeData with both sales & revenue
         const formattedData = response.data.map((entry) => ({
@@ -92,27 +81,12 @@ const HomePage = () => {
   useEffect(() => {
     const fetchTotals = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const usersResponse = await axios.get(
-          "http://localhost:8000/api/users/total/",
-          { headers }
-        );
-        const customersResponse = await axios.get(
-          "http://localhost:8000/api/customers/total/",
-          { headers }
-        );
-        const categoriesResponse = await axios.get(
-          "http://localhost:8000/api/categories/total/",
-          { headers }
-        );
-        const salesResponse = await axios.get(
-          "http://localhost:8000/api/sales/total/count/",
-          { headers }
-        );
-        const productsResponse = await axios
-          .get("http://localhost:8000/api/products/total/", { headers })
+        const usersResponse = await api.get("/users/total/");
+        const customersResponse = await api.get("/customers/total/");
+        const categoriesResponse = await api.get("/categories/total/");
+        const salesResponse = await api.get("/sales/total/count/");
+        const productsResponse = await api
+          .get("/products/total/")
           .catch((error) => {
             console.error(
               "❌ Error fetching total products:",
@@ -139,21 +113,9 @@ const HomePage = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const salesRes = await axios.get(
-          "http://localhost:8000/api/sales/latest/",
-          { headers }
-        );
-        const recentRes = await axios.get(
-          "http://localhost:8000/api/products/recent/",
-          { headers }
-        );
-        const lowStockRes = await axios.get(
-          "http://localhost:8000/api/products/low-stock/",
-          { headers }
-        );
+        const salesRes = await api.get("/sales/latest/");
+        const recentRes = await api.get("/products/recent/");
+        const lowStockRes = await api.get("/products/low-stock/");
 
         setLatestSales(salesRes.data);
         setRecentProducts(recentRes.data); // Ensure this is correctly set
@@ -236,7 +198,7 @@ const HomePage = () => {
               </tr>
             </thead>
             <tbody>
-              {latestSales.map((sale, index) => (
+              {latestSales.map((sale) => (
                 <tr key={sale.id}>
                   <td>{sale.product_id}</td>
                   <td>{sale.item_code}</td>

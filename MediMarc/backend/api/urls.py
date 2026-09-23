@@ -36,13 +36,13 @@ urlpatterns = [
     path("products/", views.get_products, name="get_products"),
     path("products/add/", views.add_product, name="add_product"),
     path(
-        "products/<str:product_id>/delete/", views.delete_product, name="delete_product"
+        "products/<int:product_id>/delete/", views.delete_product, name="delete_product"
     ),
     path("products/<int:product_id>/", views.get_product_details, name="get_product_details"),
 
-    path("products/<str:product_id>/edit/", views.edit_product, name="edit_product"),
+    path("products/<int:product_id>/edit/", views.edit_product, name="edit_product"),
     path(
-        "products/<str:product_id>/update-stock/",
+        "products/<int:product_id>/update-stock/",
         views.update_stock,
         name="update_stock",
     ),
@@ -53,7 +53,7 @@ urlpatterns = [
     path("customers/", views.customer_list, name="customer_list"),
     path("customers/<int:pk>/", views.customer_detail, name="customer_detail"),
     path("sales/customers/", views.get_customers, name="get_customers"),
-    path("sales/products/", views.get_products, name="get_products"),
+    path("sales/products/", views.get_products, name="sales_product_options"),
     path("sales/add/", views.add_sale, name="add_sale"),
     path("sales/<int:id>/delete/", views.delete_sale, name="delete_sale"),
     path("sales/<int:id>/get", views.get_sale, name="get_sale"),

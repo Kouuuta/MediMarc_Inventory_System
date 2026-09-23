@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
 import "../styles/ResetPassword.css";
 import { toast } from "sonner";
+import api from "../services/api";
 
 const ResetPassword = () => {
   const { uidb64, token } = useParams();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [error] = useState("");
+  const [message] = useState("");
 
   useEffect(() => {
     // Optional: Validate the token here if needed
@@ -30,15 +30,9 @@ const ResetPassword = () => {
     }
 
     try {
-      const response = await axios.post(
-        `http://localhost:8000/api/reset-password/${uidb64}/${token}/`,
-        { password }, // ✅ Send JSON body correctly
-        {
-          headers: {
-            "Content-Type": "application/json", // ✅ Ensure proper headers
-          },
-        }
-      );
+      await api.post(`/reset-password/${uidb64}/${token}/`, {
+        password,
+      });
 
       toast.success("Password reset successful! Redirecting...");
       setTimeout(() => navigate("/"), 2000);

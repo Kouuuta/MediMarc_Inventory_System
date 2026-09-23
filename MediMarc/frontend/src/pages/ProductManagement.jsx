@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/ProductManagement.css";
-import axios from "axios";
 import "../pages/Categories";
 import Select from "react-select";
 import { toast } from "sonner";
 import { confirmDialog } from "primereact/confirmdialog";
+import api from "../services/api";
 
 const ProductManagement = () => {
   const navigate = useNavigate();
@@ -18,13 +18,11 @@ const ProductManagement = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isProductDetailsOpen, setIsProductDetailsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [totalStock, setTotalStock] = useState(0);
   const [itemCodeFilter, setItemCodeFilter] = useState("");
-  const [selectedItemCode, setSelectedItemCode] = useState(null);
 
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const loggedInUserType = loggedInUser.user_type_display;
+  const loggedInUserType = loggedInUser?.user_type_display;
   console.log(loggedInUserType);
 
   const [newProduct, setNewProduct] = useState({
@@ -36,22 +34,6 @@ const ProductManagement = () => {
     sellingPrice: "",
   });
 
-  const fetchLowStockProducts = async () => {
-    try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.get(
-        "http://localhost:8000/api/products/low-stock/",
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setFilteredProducts(response.data); // Update the low stock products state
-    } catch (error) {
-      console.error(
-        "Error fetching low stock products:",
-        error.response?.data || error.message
-      );
-    }
-  };
-
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (!token) {
@@ -60,10 +42,7 @@ const ProductManagement = () => {
   }, []);
   const fetchProducts = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.get("http://localhost:8000/api/products/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get("/products/");
       setProducts(response.data);
     } catch (error) {
       console.error(
@@ -75,16 +54,14 @@ const ProductManagement = () => {
 
   useEffect(() => {
     if (searchTerm) {
-      const filtered = products.filter((product) =>
-        product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      const total = products
+        .filter((product) =>
+          product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .reduce((acc, product) => acc + product.stock, 0);
 
-      const total = filtered.reduce((acc, product) => acc + product.stock, 0);
-
-      setFilteredProducts(filtered);
       setTotalStock(total);
     } else {
-      setFilteredProducts([]);
       setTotalStock(0);
     }
   }, [searchTerm, products]);
@@ -94,13 +71,7 @@ const ProductManagement = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get(
-          "http://localhost:8000/api/categories/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await api.get("/categories/");
         setCategories(response.data);
       } catch (error) {
         console.error(
@@ -116,13 +87,7 @@ const ProductManagement = () => {
   useEffect(() => {
     const fetchTotalProducts = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get(
-          "http://localhost:8000/api/products/total2/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await api.get("/products/total2/");
 
         console.log("Total Products Fetched:", response.data);
         setTotalProducts(response.data.total2_products);
@@ -165,10 +130,8 @@ const ProductManagement = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-
-      const response = await axios.put(
-        `http://localhost:8000/api/products/${editProduct.product_id}/edit/`,
+      const response = await api.put(
+        `/products/${editProduct.product_id}/edit/`,
         {
           item_code: editProduct.item_code,
           product_name: editProduct.product_name,
@@ -178,8 +141,7 @@ const ProductManagement = () => {
           expiration_date: editProduct.expiration_date,
           selling_price: parseFloat(editProduct.selling_price),
           stock: parseInt(editProduct.stock, 10),
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+        }
       );
 
       setProducts(
@@ -233,34 +195,21 @@ const ProductManagement = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-
-      const response = await axios.post(
-        "http://localhost:8000/api/products/add/",
-        {
-          item_code: newProduct.itemCode,
-          product_name: newProduct.productName,
-          category: newProduct.category,
-          buying_price: newProduct.buyingPrice || 0,
-          selling_price: newProduct.sellingPrice || 0,
-          stock: newProduct.inStock, // stock to the input value (sales stock)
-          original_stock: newProduct.inStock, // set original stock to the same value
-          lot_number: newProduct.lotNumber,
-          expiration_date: newProduct.expirationDate,
-          shipment_date: newProduct.shipmentDate,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await api.post("/products/add/", {
+        item_code: newProduct.itemCode,
+        product_name: newProduct.productName,
+        category: newProduct.category,
+        buying_price: newProduct.buyingPrice || 0,
+        selling_price: newProduct.sellingPrice || 0,
+        stock: newProduct.inStock, // stock to the input value (sales stock)
+        original_stock: newProduct.inStock, // set original stock to the same value
+        lot_number: newProduct.lotNumber,
+        expiration_date: newProduct.expirationDate,
+        shipment_date: newProduct.shipmentDate,
+      });
 
       // Get updated product data to reflect changes in the UI
-      const updatedProductsResponse = await axios.get(
-        "http://localhost:8000/api/products/",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const updatedProductsResponse = await api.get("/products/");
       console.log(response.data);
       setProducts(updatedProductsResponse.data); // Update state with new data
       toast.success("Product added successfully!", { duration: 2000 });
@@ -309,16 +258,7 @@ const ProductManagement = () => {
       rejectLabel: "Cancel",
       accept: async () => {
         try {
-          const token = localStorage.getItem("access_token");
-
-          await axios.delete(
-            `http://localhost:8000/api/products/${encodeURIComponent(
-              productId
-            )}/delete/`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
+          await api.delete(`/products/${encodeURIComponent(productId)}/delete/`);
 
           setProducts((prevProducts) =>
             prevProducts.filter((product) => product.product_id !== productId)
@@ -363,15 +303,12 @@ const ProductManagement = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-
-      const response = await axios.put(
-        `http://localhost:8000/api/products/${encodeURIComponent(stockDetails.productId)}/update-stock/`,
+      const response = await api.put(
+        `/products/${encodeURIComponent(stockDetails.productId)}/update-stock/`,
         {
           stock: stockValue,
           shipment_date: stockDetails.shipmentDate,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
+        }
       );
 
       const updatedProduct = response.data.new_product;
@@ -443,14 +380,9 @@ const ProductManagement = () => {
   console.log(products[0]);
 
   const handleGenerateCSV = async () => {
-    const token = localStorage.getItem("access_token");
-
     try {
-      const response = await axios.get(
-        `http://localhost:8000/api/products/generate-csv/?item_code=${itemCodeFilter}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const response = await api.get(
+        `/products/generate-csv/?item_code=${itemCodeFilter}`
       );
       // Trigger download
       const blob = new Blob([response.data], { type: "text/csv" });
@@ -466,23 +398,14 @@ const ProductManagement = () => {
 
   const handleUpdateCriticalStock = async (productId, newCriticalStock) => {
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.put(
-        `http://localhost:8000/api/products/${productId}/update-critical-stock/`,
-        { critical_stock: newCriticalStock },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      await api.put(
+        `/products/${productId}/update-critical-stock/`,
+        { critical_stock: newCriticalStock }
       );
 
       toast.success("Critical stock updated successfully!", { duration: 2000 });
 
-      // Fetch low stock products after critical stock update
-      fetchLowStockProducts(); // Ensure low stock products are refreshed
-
-      // Optionally, refresh the product list as well
+      // Refresh the product list
       fetchProducts();
     } catch (error) {
       console.error("Error updating critical stock:", error);

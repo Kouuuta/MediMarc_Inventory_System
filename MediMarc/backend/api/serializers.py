@@ -1,14 +1,7 @@
-import json
-from django.contrib.auth.models import User
-from requests import Response
 from rest_framework import serializers
-from rest_framework.viewsets import ModelViewSet
-from .models import Product, Category, Customer, Sale, CustomUser
-from rest_framework import viewsets
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from django.utils import timezone
-from datetime import datetime
-from easyaudit.models import ContentType, CRUDEvent, LoginEvent
+
+from .models import Category, Customer, CustomUser, Product, Sale
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -30,6 +23,7 @@ class LoginSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
 
         data['user'] = {
+            'id': self.user.id,
             'username': self.user.username,
             'user_type_display': self.user.get_user_type_display()
         }
@@ -73,21 +67,3 @@ class SaleSerializer(serializers.ModelSerializer):
         model = Sale
         fields = ["invoice_number","id", "customer", "customer_name", "product", "product_id", "product_name",
                   "item_code", "lot_number", "expiration_date", "quantity", "selling_price", "total", "date", "status"]
-
-class SaleViewSet(ModelViewSet):
-    queryset = Sale.objects.all()
-    serializer_class = SaleSerializer
-
-    def create(self, request, *args, **kwargs):
-        print("📌 Incoming Sale Data:", json.dumps(request.data, indent=2))
-
-        product_id = request.data.get("product")
-        if not Product.objects.filter(id=product_id).exists():
-            return Response({"product": ["Product ID does not exist."]}, status=status.HTTP_400_BAD_REQUEST)
-
-        return super().create(request, *args, **kwargs)
-
-class LoginEventSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = LoginEvent
-        fields = "__all__"

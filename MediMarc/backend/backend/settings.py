@@ -1,39 +1,36 @@
-import os
 from datetime import timedelta
 from pathlib import Path
 
+from decouple import Csv, config
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-hl8&ca#g#(efzigkg&tey-2o@uc8h22(jyt(013$2a81n-e^ko"
-DEBUG = True
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+SECRET_KEY = config("SECRET_KEY", default="django-insecure-local-dev-only")
+DEBUG = config("DEBUG", default=False, cast=bool)
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]  # ✅ Allow React frontend
-CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:5173,http://127.0.0.1:5173",
+    cast=Csv(),
+)  # ✅ Allow React frontend
 
 
 AUTH_USER_MODEL = "api.CustomUser"
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv(
-    "EMAIL_HOST_USER", "medimarctrading@gmail.com"
-)  # Use env variables
-EMAIL_HOST_PASSWORD = os.getenv(
-    "EMAIL_HOST_PASSWORD", "xpzb vxns awjy bglb"
-)  # Use env variables
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="medimarctrading@gmail.com")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 
-RESEND_API_KEY = "re_VrroGBYA_4dHSNb4skEGcN4FKHNF44EXg"
+RESEND_API_KEY = config("RESEND_API_KEY", default="")
 
-FRONTEND_URL = "http://localhost:5173"  # Your frontend application URL
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 

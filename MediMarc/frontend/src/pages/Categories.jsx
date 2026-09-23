@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import "../styles/Categories.css";
 import { toast } from "sonner";
+import api from "../services/api";
 
 const Categories = () => {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ const Categories = () => {
   const [isEditPopupOpen, setIsEditPopupOpen] = useState(false);
   const [editCategory, setEditCategory] = useState({ id: null, name: "" });
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const loggedInUserType = loggedInUser.user_type_display;
+  const loggedInUserType = loggedInUser?.user_type_display;
   console.log(loggedInUserType);
 
   useEffect(() => {
@@ -21,17 +21,7 @@ const Categories = () => {
     }
     const fetchCategories = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          console.error("Access token not found");
-          return;
-        }
-        const response = await axios.get(
-          "http://localhost:8000/api/categories/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await api.get("/categories/");
         setCategories(response.data);
       } catch (error) {
         console.error(
@@ -51,12 +41,9 @@ const Categories = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.post(
-        "http://localhost:8000/api/categories/",
-        { name: newCategory.trim() },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.post("/categories/", {
+        name: newCategory.trim(),
+      });
 
       setCategories([...categories, response.data]); // Add the new category
       setNewCategory("");
@@ -78,12 +65,9 @@ const Categories = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.put(
-        `http://localhost:8000/api/categories/${editCategory.id}/`,
-        { name: editCategory.name.trim() },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.put(`/categories/${editCategory.id}/`, {
+        name: editCategory.name.trim(),
+      });
 
       setCategories(
         categories.map((cat) =>
@@ -105,10 +89,7 @@ const Categories = () => {
 
   const handleDeleteCategory = async (id) => {
     try {
-      const token = localStorage.getItem("access_token");
-      await axios.delete(`http://localhost:8000/api/categories/${id}/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/categories/${id}/`);
       setCategories(categories.filter((cat) => cat.id !== id));
       toast.success("Category deleted successfully!", { duration: 2000 });
     } catch (error) {

@@ -1,43 +1,24 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import Select from "react-select";
 import "../styles/Sales.css";
 import { toast } from "sonner";
 import { confirmDialog } from "primereact/confirmdialog";
+import api from "../services/api";
 
 const Sales = () => {
   const navigate = useNavigate();
   const [sales, setSales] = useState([]); // ✅ Ensures sales is never undefined
-  const [dailyPage, setDailyPage] = useState(1);
-  const [monthlyPage, setMonthlyPage] = useState(1);
-  const [page, setPage] = useState(1);
+  const [page] = useState(1);
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [isEditSaleOpen, setIsEditSaleOpen] = useState(false);
   const [editSale, setEditSale] = useState(null);
 
-  const loggedInUserId = localStorage.getItem("userId") || "";
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const loggedInUserType = loggedInUser.user_type_display;
+  const loggedInUserType = loggedInUser?.user_type_display;
   console.log(loggedInUserType);
-
-  const [dailySales, setDailySales] = useState({
-    results: [],
-    current_page: 1,
-    total_pages: 1,
-    has_next: false,
-    has_previous: false,
-  });
-
-  const [monthlySales, setMonthlySales] = useState({
-    results: [],
-    current_page: 1,
-    total_pages: 1,
-    has_next: false,
-    has_previous: false,
-  });
 
   const customerOptions = customers.map((customer) => ({
     value: customer.id,
@@ -69,10 +50,7 @@ const Sales = () => {
   useEffect(() => {
     const fetchSales = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get("http://localhost:8000/api/sales/", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await api.get("/sales/");
 
         console.log("📌 Sales Data Fetched:", response.data);
         setSales(response.data); // ✅ Ensure state is updated correctly
@@ -87,68 +65,6 @@ const Sales = () => {
 
     fetchSales();
   }, []);
-
-  const filterDailySales = (sales) => sales; // Just return all sales without filtering
-  const filterMonthlySales = (sales) => sales; // Just return all sales without filtering
-
-  useEffect(() => {
-    const fetchSummarySales = async () => {
-      try {
-        const token = localStorage.getItem("access_token");
-
-        const [dailyRes, monthlyRes] = await Promise.all([
-          axios.get(
-            `http://localhost:8000/api/sales/daily/?page=${dailyPage}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-          axios.get(
-            `http://localhost:8000/api/sales/monthly/?page=${monthlyPage}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-        ]);
-
-        // Debugging logs to inspect fetched data before filtering
-        console.log("📌 Daily Sales Data Fetched:", dailyRes.data.sales);
-        console.log("📌 Monthly Sales Data Fetched:", monthlyRes.data.sales);
-
-        const filteredDailySales = filterDailySales(dailyRes.data.sales);
-        const filteredMonthlySales = filterMonthlySales(monthlyRes.data.sales);
-
-        // Log filtered sales data to confirm the filtering logic
-        console.log("📌 Filtered Daily Sales:", filteredDailySales);
-        console.log("📌 Filtered Monthly Sales:", filteredMonthlySales);
-
-        setDailySales({
-          ...dailyRes.data,
-          sales: filteredDailySales,
-        });
-
-        setMonthlySales({
-          ...monthlyRes.data,
-          sales: filteredMonthlySales,
-        });
-      } catch (error) {
-        console.error("Error fetching sales summaries:", error);
-      }
-    };
-
-    fetchSummarySales();
-  }, [dailyPage, monthlyPage]);
-
-  const handleLogout = () => {
-    // ✅ Clear authentication data
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-
-    // ✅ Redirect to login page
-    window.location.href = "/";
-
-    // ✅ Prevent back navigation after logout
-    setTimeout(() => {
-      window.history.replaceState(null, null, "/");
-    }, 0);
-  };
 
   const handleDeleteSale = async (saleId) => {
     console.log(`📌 Attempting to delete sale: ${saleId}`);
@@ -169,28 +85,7 @@ const Sales = () => {
       rejectLabel: "Cancel",
       accept: async () => {
         try {
-          const token = localStorage.getItem("access_token");
-          if (!token) {
-            toast.error("Unauthorized. Please log in again.", {
-              duration: 2000,
-            });
-            console.error("❌ No token found. Redirecting to login.");
-            navigate("/");
-            return;
-          }
-
-          console.log(`📌 Deleting Sale ID: ${saleId}`);
-          console.log(
-            `📌 DELETE URL: http://localhost:8000/api/sales/${saleId}/delete/`
-          );
-          console.log(saleId);
-
-          const response = await axios.delete(
-            `http://localhost:8000/api/sales/${saleId}/delete/`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
+          const response = await api.delete(`/sales/${saleId}/delete/`);
 
           if (response.status === 200) {
             setSales((prevSales) =>
@@ -223,24 +118,12 @@ const Sales = () => {
     // ✅ Move fetchDropdownData ABOVE useEffect
     const fetchDropdownData = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-
         // Fetch customers
-        const customerResponse = await axios.get(
-          "http://localhost:8000/api/sales/customers/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const customerResponse = await api.get("/sales/customers/");
         setCustomers(customerResponse.data);
 
         // Fetch products
-        const productResponse = await axios.get(
-          "http://localhost:8000/api/sales/products/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const productResponse = await api.get("/sales/products/");
         setProducts(productResponse.data);
       } catch (error) {
         console.error(
@@ -312,27 +195,10 @@ const Sales = () => {
     };
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.post(
-        "http://localhost:8000/api/sales/add/",
-        salePayload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.post("/sales/add/", salePayload);
 
       // Update sales list
       setSales([...sales, response.data]);
-
-      // Update product stock (subtract the sold quantity)
-      const updatedProducts = products.map((product) =>
-        product.product_id === productObj.product_id
-          ? {
-              ...product,
-              stock: product.stock - combinedQuantity, // Subtract the sold quantity from stock
-            }
-          : product
-      );
-
-      setProducts(updatedProducts); // Update product list with new stock
 
       toast.success("Sale added successfully!", { duration: 2000 });
 
@@ -367,17 +233,12 @@ const Sales = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.put(
-        `http://localhost:8000/api/sales/${editSale.id}/edit/`,
-        {
-          product: parseInt(editSale.product, 10),
-          quantity: parseInt(editSale.quantity, 10),
-          total: parseFloat(editSale.total),
-          date: editSale.date,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.put(`/sales/${editSale.id}/edit/`, {
+        product: parseInt(editSale.product, 10),
+        quantity: parseInt(editSale.quantity, 10),
+        total: parseFloat(editSale.total),
+        date: editSale.date,
+      });
 
       setSales(
         sales.map((sale) => (sale.id === editSale.id ? response.data : sale))
@@ -396,32 +257,11 @@ const Sales = () => {
 
   const handleStatusChange = async (saleId, newStatus) => {
     try {
-      const token = localStorage.getItem("access_token");
-
-      const response = await axios.put(
-        `http://localhost:8000/api/sales/${saleId}/update-status/`,
-        { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await api.put(`/sales/${saleId}/update-status/`, {
+        status: newStatus,
+      });
 
       toast.success(`Sale status updated to ${newStatus}`);
-
-      // If status is 'Delivered', subtract the sold quantity from stock
-      if (newStatus === "Delivered") {
-        const product = response.data.product; // Assuming this includes product data
-        const quantitySold = response.data.quantity; // Assuming the quantity is available in response
-
-        setProducts((prevProducts) =>
-          prevProducts.map((product) =>
-            product.product_id === product.product_id
-              ? {
-                  ...product,
-                  stock: product.stock - quantitySold, // Subtract the sold quantity from stock
-                }
-              : product
-          )
-        );
-      }
 
       // Update sales with the new status
       setSales((prevSales) =>

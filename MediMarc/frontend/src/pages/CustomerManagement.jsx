@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/CustomerManagement.css";
 import { toast } from "sonner";
 import { confirmDialog } from "primereact/confirmdialog";
+import api from "../services/api";
 
 const CustomerManagement = () => {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ const CustomerManagement = () => {
   });
 
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const loggedInUserType = loggedInUser.user_type_display;
+  const loggedInUserType = loggedInUser?.user_type_display;
   console.log(loggedInUserType);
 
   useEffect(() => {
@@ -27,13 +27,7 @@ const CustomerManagement = () => {
     }
     const fetchCustomers = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get(
-          "http://localhost:8000/api/customers/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await api.get("/customers/");
         const sortedCustomers = response.data.sort((a, b) =>
           a.name.localeCompare(b.name)
         );
@@ -56,14 +50,7 @@ const CustomerManagement = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.post(
-        "http://localhost:8000/api/customers/",
-        newCustomer,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await api.post("/customers/", newCustomer);
 
       setCustomers([...customers, response.data]);
       setNewCustomer({ name: "", address: "" });
@@ -90,13 +77,9 @@ const CustomerManagement = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.put(
-        `http://localhost:8000/api/customers/${editCustomer.id}/`,
-        editCustomer,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const response = await api.put(
+        `/customers/${editCustomer.id}/`,
+        editCustomer
       );
 
       setCustomers(
@@ -134,10 +117,7 @@ const CustomerManagement = () => {
       rejectLabel: "Cancel",
       accept: async () => {
         try {
-          const token = localStorage.getItem("access_token");
-          await axios.delete(`http://localhost:8000/api/customers/${id}/`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          await api.delete(`/customers/${id}/`);
 
           setCustomers((prevCustomers) =>
             prevCustomers.filter((cust) => cust.id !== id)
@@ -161,17 +141,6 @@ const CustomerManagement = () => {
         toast.info("Deletion cancelled.");
       },
     });
-  };
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-
-    window.location.href = "/";
-
-    setTimeout(() => {
-      window.history.replaceState(null, null, "/");
-    }, 0);
   };
 
   return (

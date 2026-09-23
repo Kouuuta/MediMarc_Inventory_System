@@ -1,10 +1,10 @@
-import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 import "../styles/SalesReport.css";
 import "../styles/Sales.css";
 import { toast } from "sonner";
+import api from "../services/api";
 
 const SalesReport = () => {
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
@@ -25,13 +25,7 @@ const SalesReport = () => {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get(
-          "http://localhost:8000/api/customers/",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await api.get("/customers/");
         setCustomers(response.data);
       } catch (error) {
         console.error("Error fetching customers:", error);
@@ -40,11 +34,7 @@ const SalesReport = () => {
 
     const fetchSales = async () => {
       try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get("http://localhost:8000/api/sales/", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
+        const response = await api.get("/sales/");
         setSales(response.data);
       } catch (error) {
         console.error("Error fetching sales:", error);
@@ -85,7 +75,6 @@ const SalesReport = () => {
         return;
       }
 
-      const token = localStorage.getItem("access_token");
       const params = new URLSearchParams({
         start_date: start || "",
         end_date: end || "",
@@ -97,10 +86,9 @@ const SalesReport = () => {
         format_type: format,
       });
 
-      const url = `http://127.0.0.1:8000/api/sales-report/?${params.toString()}`;
+      const url = `/sales-report/?${params.toString()}`;
 
-      const response = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await api.get(url, {
         responseType: "blob",
       });
 

@@ -1,50 +1,46 @@
 import csv
-import json
-from django.db.models import F
-from datetime import datetime, timedelta
-from django.utils import timezone
-from django.db.models import Count, Sum
+import logging
+from datetime import timedelta
 from io import BytesIO
+from pathlib import Path
+
 from django.conf import settings
-from django.contrib.auth import authenticate, logout
-from django.contrib.auth.models import User
+from django.contrib.auth import logout
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.db import transaction
+from django.db.models import Count, F, Max, Sum
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from django_filters.rest_framework import DjangoFilterBackend
-from reportlab.pdfgen import canvas
+from easyaudit.models import CRUDEvent
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from .filters import SalesFilter
+
 from .models import Category, Customer, CustomUser, Product, Sale
 from .serializers import (
     CategorySerializer,
     CustomerSerializer,
+    LoginSerializer,
     ProductSerializer,
     SaleSerializer,
     UserSerializer,
-    LoginSerializer,
 )
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from .filters import SalesFilter
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase import pdfmetrics
-from django.shortcuts import get_object_or_404
-from easyaudit.models import CRUDEvent
-from rest_framework.views import APIView
-from django.core.paginator import Paginator
+
+logger = logging.getLogger(__name__)
 
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
@@ -104,36 +100,6 @@ class ActivityLogView(APIView):
     
 class LoginView(TokenObtainPairView):
     serializer_class = LoginSerializer
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def login_user(request):
-    """Login a user using JWT (No CSRF)"""
-    username = request.data.get("username")
-    password = request.data.get("password")
-
-    user = authenticate(username=username, password=password)
-    if not user:
-        return Response(
-            {"error": "Invalid username or password"},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
-
-    refresh = RefreshToken.for_user(user)
-
-    return Response(
-        {
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-            },
-        },
-        status=status.HTTP_200_OK,
-    )
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -214,7 +180,7 @@ def forgot_password(request):
 
         reset_link = f"{settings.FRONTEND_URL}/reset-password/{uidb64}/{token}"
 
-        print(f"✅ Debug: Reset link generated: {reset_link}")
+        logger.info("Password reset requested for %s", email)
 
         send_mail(
         subject="Medimarc Trading",
@@ -250,11 +216,9 @@ def forgot_password(request):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    except User.DoesNotExist:
+    except CustomUser.DoesNotExist:
         return Response({"error": "Email not found"}, status=status.HTTP_404_NOT_FOUND)
 
-
-from django.contrib.auth.hashers import make_password
 
 @api_view(["POST"])
 @permission_classes([AllowAny])  # ✅ Allow unauthenticated access
@@ -421,7 +385,6 @@ def add_product(request):
 
     # Create Product
     data = request.data.copy()
-    data["sales_stock"] = data.get("original_stock", 0)  # Ensure sales stock is equal to original stock
     serializer = ProductSerializer(data=data)
 
     if serializer.is_valid():
@@ -480,8 +443,7 @@ def update_stock(request, product_id):
         )
 
     try:
-        # Log the request data to debug
-        print(f"Request data: {request.data}")
+        logger.info("Adding stock to product %s: data=%s", product_id, request.data)
 
         stock_to_add = int(request.data.get("stock", 0))  # Ensure 'stock' is present
         shipment_date = request.data.get("shipment_date", None)
@@ -587,15 +549,15 @@ def get_recently_added_products(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_low_stock_products(request):
-    """Fetch products with aggregated stock by item code, only showing item codes with stock <= 500."""
-    low_stock_products = Product.objects.values('item_code') \
-        .annotate(total_stock=Sum('stock')) \
-        .filter(total_stock__lte=F('critical_stock'))  # Check against the critical stock value
-    
-    # Convert the QuerySet to a list of dictionaries before passing it to JsonResponse
-    low_stock_products_list = list(low_stock_products)
+    """Fetch item codes whose aggregated total stock is at or below their critical stock level."""
+    low_stock_products = list(
+        Product.objects.values("item_code")
+        .annotate(total_stock=Sum("stock"), critical_stock=Max("critical_stock"))
+        .filter(total_stock__lte=F("critical_stock"))
+        .order_by("item_code")
+    )
 
-    return JsonResponse(low_stock_products_list, safe=False, status=status.HTTP_200_OK)
+    return JsonResponse(low_stock_products, safe=False, status=status.HTTP_200_OK)
 
 
 
@@ -708,7 +670,7 @@ def get_customers(request):
 @permission_classes([IsAuthenticated])
 def add_sale(request):
     """Add a new sale but only deduct stock when status is 'Delivered'."""
-    print("📌 Incoming Sale Data:", request.data)
+    logger.info("Incoming Sale Data: %s", request.data)
 
     # ✅ Ensure product exists
     product_id = request.data.get("product")
@@ -723,10 +685,10 @@ def add_sale(request):
     serializer = SaleSerializer(data=sale_data)
     if serializer.is_valid():
         sale = serializer.save()
-        print("✅ Sale Created:", sale)
+        logger.info("Sale created: %s", sale)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    print("❌ Sale Validation Errors:", serializer.errors)
+    logger.warning("Sale validation errors: %s", serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -743,6 +705,11 @@ def update_sale_status(request, sale_id):
     previous_status = sale.status
     new_status = request.data.get("status", sale.status)
 
+    if new_status not in dict(Sale.STATUS_CHOICES):
+        return Response(
+            {"error": "Invalid status value."}, status=status.HTTP_400_BAD_REQUEST
+        )
+
     # ✅ Prevent changing status if already delivered
     if sale.status == "Delivered":
         return Response(
@@ -750,21 +717,35 @@ def update_sale_status(request, sale_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # ✅ Update status
-    sale.status = new_status
-    sale.save()
-
-    # ✅ Deduct stock only when transitioning to "Delivered"
+    # ✅ Deduct stock only when transitioning to "Delivered".
+    #    Validate stock BEFORE saving the new status so a failed delivery
+    #    cannot leave the sale marked as "Delivered".
     if previous_status != "Delivered" and new_status == "Delivered":
-        product = sale.product  # Get product instance
-        if product.stock < sale.quantity:
-            return Response(
-                {"error": "Not enough stock available to deliver this order"},
-                status=status.HTTP_400_BAD_REQUEST,
+        with transaction.atomic():
+            product = Product.objects.select_for_update().get(
+                product_id=sale.product.product_id
             )
+            if product.stock < sale.quantity:
+                return Response(
+                    {"error": "Not enough stock available to deliver this order"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        product.stock -= sale.quantity
-        product.save()
+            product.stock -= sale.quantity
+            product.save()
+
+            sale.status = new_status
+            sale.save()
+
+        logger.info(
+            "Sale %s marked as Delivered; deducted %s from product %s",
+            sale_id,
+            sale.quantity,
+            product.product_id,
+        )
+    else:
+        sale.status = new_status
+        sale.save()
 
     return Response({"message": "Sale status updated successfully", "status": sale.status})
 
@@ -792,26 +773,6 @@ def get_sale(request, pk):
     sale = get_object_or_404(Sale, pk=pk)
     serializer = SaleSerializer(sale)
     return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class SaleViewSet(ModelViewSet):
-    queryset = Sale.objects.all()
-    serializer_class = SaleSerializer
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request, *args, **kwargs):
-        print("📌 Incoming Sale Data:", json.dumps(request.data, indent=2))
-
-        product_id = request.data.get("product")
-        if not Product.objects.filter(
-            id=product_id
-        ).exists():  # ✅ Ensure correct ID check
-            return Response(
-                {"product": ["Product ID does not exist."]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return super().create(request, *args, **kwargs)
 
 
 class GenerateSalesReport(APIView):
@@ -914,7 +875,19 @@ def generate_product_csv(request):
 
 def generate_pdf_report(sales, start_date, end_date, customer_name):
     """Generate a formatted PDF Sales Report with only 'Delivered' sales."""
-    pdfmetrics.registerFont(TTFont("ArialUnicode", "arial.ttf"))
+    # Try to register Arial (Unicode) for the report body, falling back to a
+    # built-in font so a missing font file never crashes report generation.
+    arial_candidates = [
+        settings.BASE_DIR / "arial.ttf",
+        Path(__file__).resolve().parent.parent / "arial.ttf",
+        Path.cwd() / "arial.ttf",
+    ]
+    arial_path = next((p for p in arial_candidates if Path(p).is_file()), None)
+    content_font = "Helvetica"
+    if arial_path:
+        pdfmetrics.registerFont(TTFont("ArialUnicode", str(arial_path)))
+        content_font = "ArialUnicode"
+
     buffer = BytesIO()
 
     pdf = SimpleDocTemplate(
@@ -929,9 +902,9 @@ def generate_pdf_report(sales, start_date, end_date, customer_name):
     # Styles for title and headers
     title_style = ParagraphStyle(name="Title", fontSize=16, alignment=1, spaceAfter=10, fontName="Helvetica-Bold")
     header_style = ParagraphStyle(name="Header", fontSize=12, alignment=1, spaceAfter=5, fontName="Helvetica-Bold")
-    body_style = ParagraphStyle(name="Normal", fontName="ArialUnicode", fontSize=8.5)
-    right_align_style = ParagraphStyle(name="RightAlign", fontName="ArialUnicode", alignment=2, fontSize=8.5)
-    total_style = ParagraphStyle(name="Total", fontName="ArialUnicode", alignment=2, textColor=colors.red, fontSize=9.5)
+    body_style = ParagraphStyle(name="Normal", fontName=content_font, fontSize=8.5)
+    right_align_style = ParagraphStyle(name="RightAlign", fontName=content_font, alignment=2, fontSize=8.5)
+    total_style = ParagraphStyle(name="Total", fontName=content_font, alignment=2, textColor=colors.red, fontSize=9.5)
 
     # Title/Header for PDF
     title = Paragraph("MediMarc Trading Inventory - Sales Report", title_style)

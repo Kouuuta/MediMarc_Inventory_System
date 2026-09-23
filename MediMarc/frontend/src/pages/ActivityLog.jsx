@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { useEffect, useState } from "react";
 import "../styles/ActivityLog.css";
+import api from "../services/api";
 
 const ActivityLog = () => {
   const [logs, setLogs] = useState([]);
@@ -19,14 +19,7 @@ const ActivityLog = () => {
           return;
         }
 
-        const response = await axios.get(
-          "http://127.0.0.1:8000/api/activity-logs/",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await api.get("/activity-logs/");
 
         if (Array.isArray(response.data)) {
           setLogs(response.data);

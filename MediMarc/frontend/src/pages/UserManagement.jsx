@@ -1,4 +1,3 @@
-import axios from "axios";
 import "primeicons/primeicons.css";
 import { ConfirmDialog, confirmDialog } from "primereact/confirmdialog";
 import "primereact/resources/primereact.min.css";
@@ -7,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import "../styles/UserManagement.css";
+import api from "../services/api";
 
 const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
@@ -31,9 +31,9 @@ const UserManagementPage = () => {
     userType: "USER",
   });
 
-  const loggedInUserId = localStorage.getItem("userId") || "";
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const loggedInUserType = loggedInUser.user_type_display;
+  const loggedInUserId = loggedInUser?.id || "";
+  const loggedInUserType = loggedInUser?.user_type_display;
   console.log(loggedInUserType);
 
   useEffect(() => {
@@ -45,15 +45,7 @@ const UserManagementPage = () => {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem("access_token");
-      if (!token) {
-        console.warn("No token found. Skipping user fetch.");
-        return;
-      }
-
-      const response = await axios.get("http://localhost:8000/api/users/", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await api.get("/users/");
 
       console.log("✅ Users fetched from API:", response.data);
       setUsers(response.data);
@@ -79,7 +71,7 @@ const UserManagementPage = () => {
     setEditUser({ ...editUser, [name]: value });
   };
 
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   const handleEditUser = async (e) => {
     e.preventDefault();
 
@@ -89,27 +81,13 @@ const UserManagementPage = () => {
     }
 
     try {
-      const token = localStorage.getItem("access_token");
-
-      // Ensure token is available and pass it in the headers
-      if (!token) {
-        toast.error("You are not authorized. Please log in again.");
-        return;
-      }
-
-      const response = await axios.put(
-        `http://localhost:8000/api/users/${editUser.id}/edit/`,
-        {
-          username: editUser.username,
-          email: editUser.email,
-          first_name: editUser.name.split(" ")[0] || "",
-          last_name: editUser.name.split(" ")[1] || "",
-          user_type: editUser.userType,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` }, // Pass the token in the header
-        }
-      );
+      const response = await api.put(`/users/${editUser.id}/edit/`, {
+        username: editUser.username,
+        email: editUser.email,
+        first_name: editUser.name.split(" ")[0] || "",
+        last_name: editUser.name.split(" ")[1] || "",
+        user_type: editUser.userType,
+      });
 
       if (response.status === 200) {
         toast.success("User updated successfully!");
@@ -140,11 +118,6 @@ const UserManagementPage = () => {
   const handleAddUser = async (e) => {
     e.preventDefault();
     setError("");
-    const token = localStorage.getItem("access_token");
-    if (!token) {
-      toast.error("You are not authorized. Please log in again.");
-      return;
-    }
 
     if (newUser.password !== newUser.confirmPassword) {
       toast.error("Passwords do not match!");
@@ -161,13 +134,7 @@ const UserManagementPage = () => {
         user_type: newUser.userType,
       };
 
-      const response = await axios.post(
-        "http://localhost:8000/api/register/",
-        userData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await api.post("/register/", userData);
 
       if (response.status === 201) {
         toast.success("✅ User created successfully!", {
@@ -238,13 +205,7 @@ const UserManagementPage = () => {
       rejectLabel: "Cancel",
       accept: async () => {
         try {
-          const token = localStorage.getItem("access_token");
-          await axios.delete(
-            `http://localhost:8000/api/users/${userId}/delete/`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
+          await api.delete(`/users/${userId}/delete/`);
 
           setUsers((prevUsers) =>
             prevUsers.filter((user) => user.id !== userId)
