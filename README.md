@@ -109,7 +109,7 @@ npm run dev                     # -> http://localhost:5173
 
 | Username | Password | Role |
 | --- | --- | --- |
-| `yutss` | `medimarc123` | SUPERADMIN |
+| `demo` | `demo123` | ADMIN |
 
 > This account exists in the local dev `db.sqlite3`. For a fresh setup, create your own via `createsuperuser`.
 
