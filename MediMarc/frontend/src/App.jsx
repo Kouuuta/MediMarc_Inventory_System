@@ -1,24 +1,22 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import Layout from "./Layout";
-import HomePage from "./pages/HomePage";
-import LoginPage from "./pages/LoginPage";
-import UserManagement from "./pages/UserManagement";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Categories from "./pages/Categories";
-import CustomerManagement from "./pages/CustomerManagement";
-import ProductManagement from "./pages/ProductManagement";
-import Sales from "./pages/Sales";
-import SalesReport from "./pages/SalesReport";
-import ActivityLog from "./pages/ActivityLog";
+import AppLayout from "@/components/layout/AppLayout";
+import HomePage from "@/pages/dashboard/HomePage";
+import LoginPage from "@/pages/auth/LoginPage";
+import UserManagement from "@/pages/admin/UserManagement";
+import ForgotPassword from "@/pages/auth/ForgotPassword";
+import ResetPassword from "@/pages/auth/ResetPassword";
+import Categories from "@/pages/inventory/Categories";
+import CustomerManagement from "@/pages/inventory/CustomerManagement";
+import ProductManagement from "@/pages/inventory/ProductManagement";
+import Sales from "@/pages/inventory/Sales";
+import SalesReport from "@/pages/inventory/SalesReport";
+import ActivityLog from "@/pages/admin/ActivityLog";
 import { Toaster } from "sonner";
-import { ConfirmDialog } from "primereact/confirmdialog";
 
 function App() {
   return (
     <>
       <Toaster position="top-center" richColors />
-      <ConfirmDialog richColors />
       <Router>
         <Routes>
           {/* Route without Layout */}
@@ -30,7 +28,7 @@ function App() {
           />
 
           {/* Routes with Layout */}
-          <Route element={<Layout />}>
+          <Route element={<AppLayout />}>
             <Route path="/home" element={<HomePage />} />
             <Route path="/user-management" element={<UserManagement />} />
             <Route path="/categories" element={<Categories />} />
